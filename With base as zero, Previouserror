@@ -1,0 +1,47 @@
+private void exec_LINECTRL_ALGO() {
+        leftMotor.forward();
+        rightMotor.forward();
+       
+        double velocidadBase = 20.0;
+        double velocidadTope = 70.0;
+
+        // PID Constants
+        double kp = 0.8; // Proportional gain
+        double ki = 0.0; // Integral gain
+        double kd = 0.8; // Derivative gain
+
+        int target = 0; // El valor objetivo para el sensor de línea (considerando 0 como la línea ideal)
+
+        int error = 0 -(perception.getRightLineSensorValue()-perception.getLeftLineSensorValue()); // Calcular el error
+        integral += error;
+        double derivative = error - previousError;
+        
+        
+        double correction = kp * error + ki * integral + kd * derivative;
+
+        double motorspeeda = velocidadBase - correction;
+        double motorspeedb = velocidadBase + correction;
+        
+        previousError= error; 
+        // So the robot does not rotate on its own axis permanently and keeps augmenting the speed infinite; needs limits
+        if (motorspeeda > velocidadTope) {
+            motorspeeda = velocidadTope;
+        }
+        if (motorspeedb > velocidadTope) {
+            motorspeedb = velocidadTope;
+        }
+        if (motorspeeda < 0) { // There were zeros before, but i think is not correct
+            motorspeeda = 0;
+        }
+        if (motorspeedb < 0) {
+            motorspeedb = 0;
+        }
+        
+        
+        LCD.drawString("Angle Sum: " + (encoderLeft.getEncoderMeasurement().getAngleSum()), 0, 5);
+//
+//        Set power of motors
+        leftMotor.setPower((int) motorspeeda);
+        rightMotor.setPower((int) motorspeedb);
+      
+    }
