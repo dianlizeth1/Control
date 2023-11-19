@@ -1,0 +1,50 @@
+ private void exec_LINECTRL_ALGO() {
+    	
+    	LCD.drawString("Angle" + (encoderLeft.getEncoderMeasurement().getAngleSum()), 0, 5);
+        LCD.drawString("Time" + (encoderLeft.getEncoderMeasurement().getDeltaT()), 0, 6);
+        
+        leftMotor.forward();
+        rightMotor.forward();
+       
+        double baseVelocity = 20.0;
+        double limitVelocity = 100.0;
+
+        // PID Constants
+        double kp = 0.2; // Proportional gain
+        double ki = 0.0; // Integral gain
+        double kd = 0.2; // Derivative gain
+
+
+        int error = Math.abs(perception.getRightLineSensorValue()-perception.getLeftLineSensorValue()); // Calculate the error
+        integral += error;
+        double derivative = error - previousError;        
+        
+        double correction = kp * error + ki * integral + kd * derivative;
+
+        double motorspeedLeft = baseVelocity + correction;
+        double motorspeedRight = baseVelocity - correction;
+        
+        previousError= error; 
+        // So the robot does not rotate on its own axis permanently and keeps augmenting the speed infinite; needs limits
+        if (motorspeedLeft > limitVelocity) {
+        	motorspeedLeft = limitVelocity;
+        }
+        if (motorspeedRight > limitVelocity) {
+        	motorspeedRight = limitVelocity;
+        }
+        if (motorspeedLeft < baseVelocity) { // There were zeros before, but i think is not correct
+        	motorspeedLeft = baseVelocity;
+        }
+        if (motorspeedRight < baseVelocity) {
+        	motorspeedRight = baseVelocity;
+        }
+        
+        LCD.drawString("Angle" + (encoderLeft.getEncoderMeasurement().getAngleSum()), 0, 5);
+        LCD.drawString("Time" + (encoderLeft.getEncoderMeasurement().getDeltaT()), 0, 6);
+       
+//
+//        Set power of motors
+        leftMotor.setPower((int) motorspeedLeft);
+        rightMotor.setPower((int) motorspeedRight);
+      
+    }
