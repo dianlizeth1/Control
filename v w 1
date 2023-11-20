@@ -1,0 +1,46 @@
+private void exec_LINECTRL_ALGO(){
+		leftMotor.forward();
+		rightMotor.forward();
+		int lowPower=70;
+		int highPower=78;
+			// when right sensor is on the lin	e, turn right
+			
+				
+			// when left sensor is on the line, turn left
+			leftMotor.setPower(lowPower);
+			rightMotor.setPower(highPower);
+			
+//		
+			// Assuming this.encoderLeft is an instance of IPerception.EncoderSensor
+
+			// Get the encoder measurement
+			IPerception.AngleDifferenceMeasurement angleMeasurementLeft = this.encoderLeft.getEncoderMeasurement();
+			
+
+			// Print the angle and delta time to the console
+			LCD.drawString("Angle L: " + angleMeasurementLeft.getAngleSum(), 0, 1);
+			LCD.drawString("Delta L: " + angleMeasurementLeft.getDeltaT(), 0, 2);
+			
+			// Assuming this.encoderRight is an instance of IPerception.EncoderSensor
+
+			// Get the encoder measurement for the right encoder
+			IPerception.AngleDifferenceMeasurement angleMeasurementRight = this.encoderRight.getEncoderMeasurement();
+
+			// Print the angle and delta time for the right encoder to the console
+			LCD.drawString("Angle R: " + angleMeasurementRight.getAngleSum(), 0, 3);
+			LCD.drawString("Delta R: " + angleMeasurementRight.getDeltaT(), 0, 4);
+
+
+
+			
+//	        double Angle=encoderLeft.getEncoderMeasurement().getAngleSum();
+//	        String displayString1 = "Angle L: " + Angle ;
+//	        LCD.drawString(displayString1, 0, 1);
+//	        		
+//	        long deltaT = encoderLeft.getEncoderMeasurement().getDeltaT();
+//	        String displayString = "Time L: " + deltaT + " ";
+//	        LCD.drawString(displayString, 0, 2);
+//	     // Display deltaT for left encoder on LCD
+	        
+//	  
+		}
