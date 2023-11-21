@@ -1,0 +1,55 @@
+private void drive(double v, double omega, double baseVelocity) {
+	    // Aufgabe 3.2
+	    double integralRight = 0; // Initialize integral for the right wheel outside the loop or method
+	    double previousErrorRight = 0; // Initialize appropriately for the right wheel
+	    double integralLeft = 0; // Initialize integral for the left wheel outside the loop or method
+	    double previousErrorLeft = 0; // Initialize appropriately for the left wheel
+
+	    double r = 2.5; // cm
+
+	    double omegaRightWheel = angleMeasurementRight.getAngleSum() / 0.1;
+	    double omegaLeftWheel = angleMeasurementLeft.getAngleSum() / 0.1;
+	    double vRight = r * omegaRightWheel;
+	    double vLeft = r * omegaLeftWheel;
+	    double desiredVRight = 2 * v - vRight;
+	    double desiredVLeft = 2 * v - vLeft;
+
+	    // PID Constants for right Wheel
+	    double kpRight = 0.08; // Proportional gain for the right wheel
+	    double kiRight = 0.04; // Integral gain for the right wheel
+	    double kdRight = 0.08; // Derivative gain for the right wheel
+
+	    // PID Constants for left Wheel
+	    double kpLeft = 0.08; // Proportional gain for the left wheel
+	    double kiLeft = 0.04; // Integral gain for the left wheel
+	    double kdLeft = 0.08; // Derivative gain for the left wheel
+
+	    double errorRight = desiredVRight - vRight; // Calculate the error for the right wheel
+	    integralRight += errorRight;
+	    double derivativeRight = errorRight - previousErrorRight;
+	    // PID for right Wheel
+	    double correctionRight = kpRight * errorRight + kiRight * integralRight + kdRight * derivativeRight;
+	    previousErrorRight = errorRight;
+
+	    double errorLeft = desiredVLeft - vLeft; // Calculate the error for the left wheel
+	    integralLeft += errorLeft;
+	    double derivativeLeft = errorLeft - previousErrorLeft;
+	    // PID for left Wheel
+	    double correctionLeft = kpLeft * errorLeft + kiLeft * integralLeft + kdLeft * derivativeLeft;
+	    previousErrorLeft = errorLeft;
+
+	    double motorspeedLeft = baseVelocity + correctionLeft;
+	    double motorspeedRight = baseVelocity + correctionRight;
+
+	    this.leftMotor.setPower((int) motorspeedLeft);
+	    this.rightMotor.setPower((int) motorspeedRight);
+		
+		LCD.drawString("PowerL: " + leftMotor.getPower(), 0, 5);
+		LCD.drawString("PowerR: " + rightMotor.getPower(), 0, 6);
+		
+		
+		
+
+		
+	}
+}
