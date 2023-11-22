@@ -1,0 +1,59 @@
+ private void exec_LINECTRL_ALGO() {
+    	
+	   leftMotor.forward();
+       rightMotor.forward();
+      
+       double baseVelocity = 20.0;
+       double limitVelocity = 60.0;
+
+       // PID Constants
+       double kp = 0.08; // Proportional gain
+       double ki = 0.05; // Integral gain
+       double kd = 1.00; // Derivative gain
+
+
+       int error = (perception.getRightLineSensorValue()-perception.getLeftLineSensorValue()); // Calculate the error
+       integral += error;
+       double derivative = error - previousError;        
+       
+       double correction = kp * error + ki * integral + kd * derivative;
+       
+       if (correction <= -200 || correction >= 200) {
+    	    // Set both motor speeds to baseVelocity
+    	    integral = 0;
+    	}
+
+       double motorspeedLeft = Math.abs(baseVelocity - correction);
+       double motorspeedRight = Math.abs(baseVelocity + correction);
+       
+       previousError= error; 
+       // So the robot does not rotate on its own axis permanently and keeps augmenting the speed infinite; needs limits
+       if (motorspeedLeft > limitVelocity) {
+       	motorspeedLeft = limitVelocity;
+       }
+       if (motorspeedRight > limitVelocity) {
+       	motorspeedRight = limitVelocity;
+       }
+       if (motorspeedLeft < baseVelocity) { 
+       	motorspeedLeft = baseVelocity;
+       }
+       if (motorspeedRight < baseVelocity) { 
+       	motorspeedRight = baseVelocity;
+ }
+//       	if (error >= -10 && error <= 10) {
+//            // Set both motor speeds to baseVelocity
+//            motorspeedLeft = baseVelocity;
+//            motorspeedRight = baseVelocity;
+//       	}
+      
+//       Set power of motors
+       leftMotor.setPower((int) motorspeedLeft);
+       rightMotor.setPower((int) motorspeedRight+3);
+       
+       LCD.drawString("mL:" + (motorspeedLeft), 0, 2);
+       LCD.drawString("mR: " + (motorspeedRight), 0, 3);
+       LCD.drawString("C: " + (correction), 0, 4);
+       LCD.drawString("Error: " + (error), 0, 5);
+       
+ 
+    }
