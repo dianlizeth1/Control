@@ -1,0 +1,65 @@
+ private void exec_LINECTRL_ALGO() {
+    	
+        leftMotor.forward();
+        rightMotor.forward();
+       
+        double baseVelocity = 20.0;
+        double limitVelocity = 60.0;
+
+        // PID Constants
+        double kp = 0.08; // Proportional gain
+        double ki = 0.00; // Integral gain
+        double kd = 0.08; // Derivative gain
+
+
+        int error = 0-(perception.getRightLineSensorValue()-perception.getLeftLineSensorValue()); // Calculate the error
+        integral += error;
+        double derivative = error - previousError;        
+        
+        double correction = kp * error + ki * integral + kd * derivative;
+
+        double motorspeedLeft = baseVelocity + correction;
+        double motorspeedRight = baseVelocity - correction;
+        
+        previousError= error; 
+        // So the robot does not rotate on its own axis permanently and keeps augmenting the speed infinite; needs limits
+        if (motorspeedLeft > limitVelocity) {
+        	motorspeedLeft = limitVelocity;
+        }
+        if (motorspeedRight > limitVelocity) {
+        	motorspeedRight = limitVelocity;
+        }
+        if (motorspeedLeft < baseVelocity) { 
+        	motorspeedLeft = baseVelocity;
+        }
+        if (motorspeedRight < baseVelocity) {
+        	motorspeedRight = baseVelocity;
+        }
+    
+       
+//
+//        Set power of motors
+        leftMotor.setPower((int) motorspeedLeft);
+        rightMotor.setPower((int) motorspeedRight);
+        
+        IPerception.AngleDifferenceMeasurement angleMeasurementLeft = this.encoderLeft.getEncoderMeasurement();
+		
+
+		// Print the angle and delta time to the console
+		LCD.drawString("Angle L: " + angleMeasurementLeft.getAngleSum(), 0, 1);
+		LCD.drawString("Delta L: " + angleMeasurementLeft.getDeltaT(), 0, 2);
+		
+		// Assuming this.encoderRight is an instance of IPerception.EncoderSensor
+
+		// Get the encoder measurement for the right encoder
+		IPerception.AngleDifferenceMeasurement angleMeasurementRight = this.encoderRight.getEncoderMeasurement();
+
+		// Print the angle and delta time for the right encoder to the console
+		LCD.drawString("Angle R: " + angleMeasurementRight.getAngleSum(), 0, 3);
+		LCD.drawString("Delta R: " + angleMeasurementRight.getDeltaT(), 0, 4);
+
+		double OmegaRightWheel= angleMeasurementRight.getAngleSum()/.1;
+		
+		LCD.drawString("wR: " + OmegaRightWheel, 0, 5);
+      
+    }
