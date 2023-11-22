@@ -1,0 +1,85 @@
+private void exec_LINECTRL_ALGO(){
+		leftMotor.forward();
+		rightMotor.forward();
+		int baseVelocity=20;
+		double limitVelocity = 100.0;
+//		
+			// Assuming this.encoderLeft is an instance of IPerception.EncoderSensor
+
+			// Get the encoder measurement
+			IPerception.AngleDifferenceMeasurement angleMeasurementLeft = this.encoderLeft.getEncoderMeasurement();
+			
+			IPerception.AngleDifferenceMeasurement angleMeasurementRight = this.encoderRight.getEncoderMeasurement();
+
+		
+			double v=10; 
+	
+		    double integralRight = 0; // Initialize integral for the right wheel outside the loop or method
+		    double previousErrorRight = 0; // Initialize appropriately for the right wheel
+		    double integralLeft = 0; // Initialize integral for the left wheel outside the loop or method
+		    double previousErrorLeft = 0; // Initialize appropriately for the left wheel
+
+		    double r = 0.028; // cm
+//		 
+
+		    double omegaRightWheel = angleMeasurementRight.getAngleSum() / 0.1;
+		    double omegaLeftWheel = angleMeasurementLeft.getAngleSum() / 0.1;
+		    double vRight = r * omegaRightWheel;
+		    double vLeft = r * omegaLeftWheel;
+		 
+		    // PID Constants and control for the right wheel
+		    double kpRight = 1.0;
+		    double kiRight = 0.8;
+		    double kdRight = 0.0;
+
+		    double errorRight = v - vRight;
+		    integralRight += errorRight;
+		    double derivativeRight = errorRight - previousErrorRight;
+		    double correctionRight = kpRight * errorRight + kiRight * integralRight + kdRight * derivativeRight;
+		    previousErrorRight = errorRight;
+
+		    // PID Constants and control for the left wheel
+		    double kpLeft = 0.5;
+		    double kiLeft = 0.4;
+		    double kdLeft = 0.3;
+
+		    double errorLeft = v - vLeft;
+		    integralLeft += errorLeft;
+		    double derivativeLeft = errorLeft - previousErrorLeft;
+		    double correctionLeft = kpLeft * errorLeft + kiLeft * integralLeft + kdLeft * derivativeLeft;
+		    previousErrorLeft = errorLeft;
+
+		    // Calculate motor speeds
+		    double motorspeedLeft = Math.abs(baseVelocity + correctionLeft);
+		    double motorspeedRight = Math.abs(baseVelocity +correctionRight);
+		    
+		    if (motorspeedLeft > limitVelocity) { //Creo que son estos if
+	        	motorspeedLeft = limitVelocity;
+	        }
+	        if (motorspeedRight > limitVelocity) {
+	        	motorspeedRight = limitVelocity;
+	        }
+	        if (motorspeedLeft < baseVelocity) { 
+	        	motorspeedLeft = baseVelocity;
+	        }
+	        if (motorspeedRight < baseVelocity) {
+	        	motorspeedRight = baseVelocity;
+	        }
+
+		    // Set motor powers
+		    this.leftMotor.setPower((int) motorspeedLeft);
+		    this.rightMotor.setPower((int) motorspeedRight);
+
+		    // Display information
+		    LCD.drawString("PowerL: " + leftMotor.getPower(), 0, 1);
+		    LCD.drawString("PowerR: " + rightMotor.getPower(), 0, 2);
+		    
+		    LCD.drawString("vRight: " +vRight, 0, 3);
+		    LCD.drawString("vLeft: " + vLeft, 0, 4);
+		    LCD.drawString("motorsLeft: " + motorspeedLeft, 0, 5);
+		    LCD.drawString("motorsRight: " + motorspeedRight, 0, 6);
+		    
+		    LCD.drawString("Error: " +errorLeft, 0, 7);
+		    LCD.drawString("Error: " +errorRight, 0, 8);
+			       
+		}
