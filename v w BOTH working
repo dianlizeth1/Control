@@ -1,0 +1,87 @@
+ private void exec_LINECTRL_ALGO() {
+    	
+	 leftMotor.forward();
+		rightMotor.forward();
+		int baseVelocity=20;
+		double limitVelocity = 100.0;
+		int v= 10;
+		int omega=0;
+			// Assuming this.encoderLeft is an instance of IPerception.EncoderSensor
+
+			// Get the encoder measurement
+			IPerception.AngleDifferenceMeasurement angleMeasurementLeft = this.encoderLeft.getEncoderMeasurement();
+			
+			IPerception.AngleDifferenceMeasurement angleMeasurementRight = this.encoderRight.getEncoderMeasurement();
+
+	
+//		    double integralRight = 0; // Initialize integral for the right wheel outside the loop or method
+//		    double previousErrorRight = 0; // Initialize appropriately for the right wheel
+		    
+			
+			    // ... (other variable declarations)
+
+			    // You may want to remove this line if you intend to use the original value of omega
+
+			  
+
+			    double r = 0.028; // cm
+			    double d = 0.114; //m
+
+			    double omegaRightWheel = angleMeasurementRight.getAngleSum() / 0.1;
+			    double omegaLeftWheel = angleMeasurementLeft.getAngleSum() / 0.1;
+			    double vRight = r * omegaRightWheel;
+			    double vLeft = r * omegaLeftWheel;
+
+			    double desiredVRight; // Declare outside the if block
+			    double desiredVLeft; // Declare outside the if block
+
+			    if (omega == 0) {
+			        desiredVRight = 2 * v - vLeft;
+			        desiredVLeft = 2 * v - vRight;
+			    } else {
+			        // Equations for Angular velocity of the robot when omega is not 0
+			        desiredVRight = d * omega + vLeft;
+			        desiredVLeft = -(d * omega + vRight);
+			    }
+
+			    // ... (other code)
+
+			    // PID Constants and control for the right wheel
+			    double kpRight = 0.90;
+			    double kiRight = 0.06;
+			    double kdRight = 0.08;
+
+			    double errorRight = desiredVRight - vRight;
+			    integralRight += errorRight;
+			    double derivativeRight = errorRight - previousErrorRight;
+			    double correctionRight = kpRight * errorRight + kiRight * integralRight + kdRight * derivativeRight;
+			    previousErrorRight = errorRight;
+
+			    // PID Constants and control for the left wheel
+			    double kpLeft = 0.08;
+			  
+			    double kiLeft = 0.06;
+			    double kdLeft = 0.08;
+
+			    double errorLeft = desiredVLeft - vLeft;
+			    integralLeft += errorLeft;
+			    double derivativeLeft = errorLeft - previousErrorLeft;
+			    double correctionLeft = kpLeft * errorLeft + kiLeft * integralLeft + kdLeft * derivativeLeft;
+			    previousErrorLeft = errorLeft;
+
+			    // Calculate motor speeds
+			    double motorspeedLeft =  baseVelocity +correctionLeft;
+			    double motorspeedRight = baseVelocity + correctionRight;
+
+			    // Set motor powers
+			    this.leftMotor.setPower((int) motorspeedLeft);
+			    this.rightMotor.setPower((int) motorspeedRight);
+
+			    // Display information
+			    LCD.drawString("PowerL: " + errorLeft, 0, 1);
+			    LCD.drawString("PowerR: " + errorRight, 0, 2);
+			    LCD.drawString("vRight: " + motorspeedRight, 0, 3);
+			    LCD.drawString("vLeft: " + motorspeedLeft,0,4);
+			}
+		
+			  
