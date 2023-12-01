@@ -1,0 +1,586 @@
+package parkingRobot.hsamr0;
+
+
+import lejos.robotics.navigation.Pose;
+import parkingRobot.IControl;
+import parkingRobot.IMonitor;
+import parkingRobot.IPerception;
+import parkingRobot.IPerception.*;
+import lejos.nxt.LCD;
+import lejos.nxt.NXTMotor;
+import parkingRobot.INavigation;
+
+/**
+ * Main class for control module
+ *
+ */
+public class ControlRST implements IControl {
+	
+	/**
+	 * reference to {@link IPerception.EncoderSensor} class for left robot wheel which measures the wheels angle difference
+	 * between actual an last request
+	 */
+	IPerception.EncoderSensor encoderLeft							=	null;
+	/**
+	 * reference to {@link IPerception.EncoderSensor} class for right robot wheel which measures the wheels angle difference
+	 * between actual an last request
+	 */
+	IPerception.EncoderSensor encoderRight							=	null;
+	
+	/**
+	 * reference to data class for measurement of the left wheels angle difference between actual an last request and the
+	 * corresponding time difference
+	 */
+	IPerception.AngleDifferenceMeasurement angleMeasurementLeft 	= 	null;
+	/**
+	 * reference to data class for measurement of the right wheels angle difference between actual an last request and the
+	 * corresponding time difference
+	 */
+	IPerception.AngleDifferenceMeasurement angleMeasurementRight	= 	null;
+	
+	/**
+	 * line information measured by right light sensor: 0 - beside line, 1 - on line border or gray underground, 2 - on line
+	 */
+	int lineSensorRight	=	0;
+	/**
+	 * line information measured by left light sensor: 0 - beside line, 1 - on line border or gray underground, 2 - on line
+	 */
+	int lineSensorLeft	=	0;
+	
+
+	
+	NXTMotor leftMotor = null;
+	NXTMotor rightMotor = null;
+	
+	IPerception perception = null;
+	INavigation navigation = null;
+	IMonitor monitor = null;
+	ControlThread ctrlThread = null;
+
+    int leftMotorPower = 0;
+	int rightMotorPower = 0;
+	
+	double velocity = 0.0;
+	double angularVelocity = 0.0;
+	
+	
+	
+	double integralRight = 0; // Initialize integral for the right wheel outside the loop or method
+	double previousErrorRight = 0; // Initialize appropriately for the right wheel
+	double integralLeft = 0; // Initialize integral for the left wheel outside the loop or method
+	double previousErrorLeft = 0; // Initialize appropriately for the left wheel
+	double integral=0;
+	double previousError=0;
+	
+	double kp =0; // Proportional gain
+	double ki = 0; // Integral gain
+	double kd = 0;
+	double integralMotors=0;
+	double previousErrorMotors=0;
+
+	double integralRightOmega = 0.0;
+	double previousErrorRightOmega = 0.0;
+	
+	double integralLeftOmega = 0.0;
+	double previousErrorLeftOmega = 0.0;
+	double errorMotors;
+	 
+	
+	
+	Pose startPosition = new Pose();
+	Pose currentPosition = new Pose();
+	Pose destination = new Pose();
+	
+	ControlMode currentCTRLMODE = null;
+	
+	EncoderSensor controlRightEncoder    = null;
+	EncoderSensor controlLeftEncoder     = null;
+
+	int lastTime = 0;
+	
+    double currentDistance = 0.0;
+    double Distance = 0.0;
+  
+	
+	/**
+	 * provides the reference transfer so that the class knows its corresponding navigation object (to obtain the current 
+	 * position of the car from) and starts the control thread.
+	 * 
+	 * @param perception corresponding main module Perception class object
+	 * @param navigation corresponding main module Navigation class object
+	 * @param monitor corresponding main module Monitor class object
+	 * @param leftMotor corresponding NXTMotor object
+	 * @param rightMotor corresponding NXTMotor object
+	 */
+	public ControlRST(IPerception perception, INavigation navigation, NXTMotor leftMotor, NXTMotor rightMotor, IMonitor monitor){
+		this.perception = perception;
+        this.navigation = navigation;
+        this.monitor = monitor;
+		this.leftMotor = leftMotor;
+		this.rightMotor = rightMotor;
+		
+		this.currentCTRLMODE = ControlMode.INACTIVE;
+			
+		this.encoderLeft  = perception.getControlLeftEncoder();
+		this.encoderRight = perception.getControlRightEncoder();
+		this.lineSensorRight		= perception.getRightLineSensor();
+		this.lineSensorLeft  		= perception.getLeftLineSensor();
+		
+		// MONITOR (example)
+		monitor.addControlVar("RightSensor");
+		monitor.addControlVar("LeftSensor");
+		
+		this.ctrlThread = new ControlThread(this);
+		
+		ctrlThread.setPriority(Thread.MAX_PRIORITY - 1);
+		ctrlThread.setDaemon(true); // background thread that is not need to terminate in order for the user program to terminate
+		ctrlThread.start();
+	}
+	
+
+	// Inputs
+	
+	/**
+	 * set velocity
+	 * @see parkingRobot.IControl#setVelocity(double velocity)
+	 */
+	public void setVelocity(double velocity) {
+		this.velocity = velocity;
+	}
+
+	/**
+	 * set angular velocity
+	 * @see parkingRobot.IControl#setAngularVelocity(double angularVelocity)
+	 */
+	public void setAngularVelocity(double angularVelocity) {
+		this.angularVelocity = angularVelocity;
+
+	}
+	
+	/**
+	 * set destination
+	 * @see parkingRobot.IControl#setDestination(double heading, double x, double y)
+	 */
+	public void setDestination(double heading, double x, double y){
+		this.destination.setHeading((float) heading);
+		this.destination.setLocation((float) x, (float) y);
+	}
+	
+
+	
+	/**
+	 * sets current pose
+	 * @see parkingRobot.IControl#setPose(Pose currentPosition)
+	 */
+	public void setPose(Pose currentPosition) {
+		// TODO Auto-generated method stub
+		this.currentPosition = currentPosition;
+	}
+	
+
+	/**
+	 * set control mode
+	 */
+	public void setCtrlMode(ControlMode ctrl_mode) {
+		this.currentCTRLMODE = ctrl_mode;
+	}
+		
+	/**
+	 * set start time
+	 */
+	public void setStartTime(int startTime){
+		this.lastTime = startTime;
+	}
+	
+	/**
+	 * selection of control-mode
+	 * @see parkingRobot.IControl#exec_CTRL_ALGO()
+	 */
+	public void exec_CTRL_ALGO(){
+		
+		switch (currentCTRLMODE)
+		{
+		  case LINE_CTRL	: update_LINECTRL_Parameter();
+		                      exec_LINECTRL_ALGO();
+		                      break;
+		  case VW_CTRL		: update_VWCTRL_Parameter();
+		   					  exec_VWCTRL_ALGO();
+		   					  break; 
+		  case SETPOSE      : update_SETPOSE_Parameter();
+			  				  exec_SETPOSE_ALGO();
+		                      break;
+		  case PARK_CTRL	: update_PARKCTRL_Parameter();
+		  					  exec_PARKCTRL_ALGO();
+		  					  break;		  					  
+		  case INACTIVE 	: exec_INACTIVE();
+			                  break;
+		  case DEMO			: UpdateDemoParameters();
+		  					  executeDemo();
+		  					  break;
+		  					
+			 
+		}
+
+	}
+	
+	// Private methods
+	
+	/**
+	 * update parameters during VW Control Mode
+	 */
+//	private void update_customFunctionDiana(){
+//		setPose(navigation.getPose());
+//	}
+	
+	private void update_VWCTRL_Parameter(){
+		setPose(navigation.getPose());
+	}
+	
+	/**
+	 * update parameters during SETPOSE Control Mode
+	 */
+	private void update_SETPOSE_Parameter(){
+		setPose(navigation.getPose());
+	}
+	
+	/**
+	 * update parameters during PARKING Control Mode
+	 */
+	private void update_PARKCTRL_Parameter(){
+		//Aufgabe 3.4
+	}
+
+	/**
+	 * update parameters during LINE Control Mode
+	 */
+	private void update_LINECTRL_Parameter(){
+		this.lineSensorRight		= perception.getRightLineSensor();
+		this.lineSensorLeft  		= perception.getLeftLineSensor();		
+	}
+	
+	/**
+	 * The car can be driven with velocity in m/s or angular velocity in grade during VW Control Mode
+	 * optionally one of them could be set to zero for simple test.
+	 */
+    private void exec_VWCTRL_ALGO(){  
+		this.drive(this.velocity, this.angularVelocity);
+	}
+	
+    private void exec_SETPOSE_ALGO(){
+    	//Aufgabe 3.3
+	}
+	
+	/**
+	 * PARKING along the generated path
+	 */
+	private void exec_PARKCTRL_ALGO(){
+		//Aufgabe 3.4
+	}
+	
+    private void exec_INACTIVE(){
+    	this.stop();
+	}
+	
+	/**
+	 * DRIVING along black line
+	 * Minimalbeispiel
+	 * Linienverfolgung fuer gegebene Werte 0,1,2
+	 * white = 0, black = 2, grey = 1
+	 */
+ // Description copied from interface: IPerception
+ 		//returns the brightness of the subsurfacecolor under the right linesensor in percent(0% for calibrated black ground;
+ 		//100% for calibrated white ground).use IPerception.calibrateLineSensors() to calibrate the sensors for given environmental brightness
+ // Description copied from interface: IPerception
+ 		//returns the brightness of the subsurfacecolor under the right linesensor in percent(0% for calibrated black ground;
+ 		//100% for calibrated white ground).use IPerception.calibrateLineSensors() to calibrate the sensors for given environmental brightness
+
+
+    private void exec_LINECTRL_ALGO() {
+    	
+    	 leftMotor.forward();
+         rightMotor.forward();
+        
+         double baseVelocity = 30.0;
+         double limitVelocity = 100.0;
+
+         // PID Constants
+         double kp = 0.08; // Proportional gain
+         double ki = 0.00; // Integral gain
+         double kd = 0.01; // Derivative gain
+
+
+         int error = (perception.getRightLineSensorValue()-perception.getLeftLineSensorValue()); // Calculate the error
+         integral += error;
+         double derivative = error - previousError;        
+         
+         double correction = kp * error + ki * integral + kd * derivative;
+         
+         if (correction <= -100 || correction >= 100) {
+      	    // Set both motor speeds to baseVelocity
+      	    integral = 0;
+      	}
+
+         double motorspeedLeft = Math.abs(baseVelocity - correction);
+         double motorspeedRight = Math.abs(baseVelocity + correction);
+         
+         previousError= error; 
+         // So the robot does not rotate on its own axis permanently and keeps augmenting the speed infinite; needs limits
+         if (motorspeedLeft > limitVelocity) {
+         	motorspeedLeft = limitVelocity;
+         }
+         if (motorspeedRight > limitVelocity) {
+         	motorspeedRight = limitVelocity;
+         }
+         if (motorspeedLeft < baseVelocity) { 
+         	motorspeedLeft = baseVelocity;
+         }
+         if (motorspeedRight < baseVelocity) { 
+         	motorspeedRight = baseVelocity;
+   }
+         
+         double phi=navigation.getPose().getHeading()/Math.PI*180;
+      	int targetAngle=270;
+         
+      	int i=0;
+     	if ((perception.getRightLineSensorValue()>= 90&& perception.getLeftLineSensorValue() >= 90) &&(phi != targetAngle)) {
+     		motorspeedLeft=0;
+     		i=i+1;
+     	}
+     	
+     
+     	
+//     	if (i==5) {
+//     		
+//     		
+//     	}
+     	
+     	
+
+         		
+      // Set power of motors
+         leftMotor.setPower((int) motorspeedLeft);
+         rightMotor.setPower((int) motorspeedRight+3);
+//         
+//         LCD.drawString("mL:" + (motorspeedLeft), 0, 2);
+//         LCD.drawString("mR: " + (motorspeedRight), 0, 3);
+//         LCD.drawString("C: " + (correction), 0, 4);
+//         LCD.drawString("Error: " + (error), 0, 5);
+      }
+   	   
+	private void stop(){
+		this.leftMotor.stop();
+		this.rightMotor.stop();
+		
+		 leftMotorPower = 0;
+			rightMotorPower = 0;
+			
+			  integralRight = 0; // Initialize integral for the right wheel outside the loop or method
+			  previousErrorRight = 0; // Initialize appropriately for the right wheel
+			  integralLeft = 0; // Initialize integral for the left wheel outside the loop or method
+			  previousErrorLeft = 0; // Initialize appropriately for the left wheel
+			 integral=0;
+			 previousError=0;
+			
+			
+			 integralMotors=0;
+			 previousErrorMotors=0;
+
+			 integralRightOmega = 0.0;
+			 previousErrorRightOmega = 0.0;
+			
+			 integralLeftOmega = 0.0;
+			 previousErrorLeftOmega = 0.0;
+			 errorMotors=0;
+		
+		
+	}
+	
+	private void UpdateDemoParameters() {
+		
+	}
+	
+	private void executeDemo() {
+//    	double omega = 0; // Set your desired angular velocity
+//      double v = 0; // Set your desired linear velocity
+        double x=navigation.getPose().getX()*100;
+        double y=navigation.getPose().getY()*100;
+        double targetCm= 120;
+        double targetCm2= 30;
+        // Call the drive method with the desired velocities
+        drive(10,0);
+        
+        double targetAngle = 90.0;
+		 double anglephi = navigation.getPose().getHeading() * 180.0 / Math.PI;
+    
+		 			if (x >= targetCm) {
+//		 					this.leftMotor.stop();
+//		 					this.rightMotor.stop();	
+		 					stop();
+		 					 drive(0,15);
+		 			}	
+		 			
+		 			if (anglephi >= targetAngle) {
+//	 					this.leftMotor.stop();
+//	 					this.rightMotor.stop();	
+		 				stop();
+	 					 drive(5,0);
+		 			}	 	
+		 			if (y >= targetCm2) {
+//	 					this.leftMotor.stop();
+//	 					this.rightMotor.stop();	
+		 				stop();
+		 				drive(0,-30);
+	 					
+		 			}	 	
+	}
+
+		
+    /**
+     * calculates the left and right angle speed of the both motors with given velocity 
+     * and angle velocity of the robot
+     * @param v velocity of the robot
+     * @param omega angle velocity of the robot
+     */
+	private void drive(double v, double omega) {
+	    // ... (other variable declarations)
+		this.leftMotor.forward();
+   		this.rightMotor.forward();
+   		int baseVelocity=20;
+   		
+   			// Assuming this.encoderLeft is an instance of IPerception.EncoderSensor
+
+   			// Get the encoder measurement
+   			IPerception.AngleDifferenceMeasurement angleMeasurementLeft = this.encoderLeft.getEncoderMeasurement();
+   			
+   			IPerception.AngleDifferenceMeasurement angleMeasurementRight = this.encoderRight.getEncoderMeasurement();
+
+   	
+   			    double r = 0.028; // m
+   			    double d = 0.114; //m
+
+   			    double omegaRightWheel = angleMeasurementRight.getAngleSum() / 0.1;
+   			    double omegaLeftWheel = angleMeasurementLeft.getAngleSum() / 0.1;
+   			    double vRight = r * omegaRightWheel;
+   			    double vLeft = r * omegaLeftWheel;
+
+   			    double desiredVRight; // Declare outside the if block
+   			    double desiredVLeft; // Declare outside the if block
+   			    
+   			   double desiredVRightOmega; // Declare outside the if block
+			   double desiredVLeftOmega;
+
+   			  
+   			        desiredVRight = 2 * v - vLeft;
+   			        desiredVLeft = 2 * v - vRight;
+   			    
+   			        // Equations for Angular velocity of the robot when omega is not 0
+   			        desiredVRightOmega = d * omega + vLeft;
+   			        desiredVLeftOmega= -d * omega +vRight;
+   			    
+
+   			    // ... (other code)
+
+   			    // PID Constants and control for the right wheel
+   			    double kpRight = 0.09;
+   			    double kiRight = 0.06;
+   			    double kdRight = 0.08;
+
+   			    double errorRight = desiredVRight - vRight;
+   			    integralRight += errorRight;
+   			    double derivativeRight = errorRight - previousErrorRight;
+   			    double correctionRight = kpRight * errorRight + kiRight * integralRight + kdRight * derivativeRight;
+   			    previousErrorRight = errorRight;
+
+   			    // PID Constants and control for the left wheel
+   			    double kpLeft = 0.08;
+   			    double kiLeft = 0.06;
+   			    double kdLeft = 0.08;
+
+   			    double errorLeft = desiredVLeft -vLeft;
+   			    integralLeft += errorLeft;
+   			    double derivativeLeft = errorLeft - previousErrorLeft;
+   			    double correctionLeft = kpLeft * errorLeft + kiLeft * integralLeft + kdLeft * derivativeLeft;
+   			    previousErrorLeft = errorLeft;
+
+   			    // Calculate motor speeds
+   			    double motorspeedLeft =  (baseVelocity +correctionLeft);
+   			    double motorspeedRight = baseVelocity + correctionRight;
+   			    
+   			//--------------------------------------------------------------------------------------  
+   			// PID Constants and control for the right wheel when implementing omega
+   			 double kpRightOmega = 0.08;
+   			 double kiRightOmega = 0.06;
+   			 double kdRightOmega = 0.08;
+
+   			 double errorRightOmega = desiredVRightOmega - vRight;
+   			 integralRightOmega += errorRightOmega;
+   			 double derivativeRightOmega = errorRightOmega - previousErrorRightOmega;
+   			 double correctionRightOmega = kpRightOmega * errorRight + kiRightOmega * integralRightOmega + kdRightOmega * derivativeRightOmega;
+   			 previousErrorRightOmega = errorRightOmega;
+   			 
+   			 // PID Constants and control for the left wheel when implementing omega
+   			 double kpLeftOmega = 0.08;
+   			 double kiLeftOmega = 0.06;
+   			 double kdLeftOmega = 0.08;
+
+   			 double errorLeftOmega = desiredVLeftOmega -vLeft;
+   			 integralLeftOmega += errorLeftOmega;
+   			 double derivativeLeftOmega = errorLeftOmega - previousErrorLeftOmega;
+   			 double correctionLeftOmega = kpLeftOmega * errorLeftOmega + kiLeftOmega * integralLeftOmega + kdLeftOmega * derivativeLeftOmega;
+   			 previousErrorLeftOmega = errorLeftOmega;
+
+   			 // Calculate motor speeds when implementing omega
+   			double motorspeedLeftOmega = -(baseVelocity + correctionLeftOmega);
+   			double motorspeedRightOmega = baseVelocity + correctionRightOmega;
+   			 
+   			 this.leftMotor.setPower((int) motorspeedLeftOmega);
+			 this.rightMotor.setPower((int) motorspeedRightOmega);
+			 
+			//--------------------------------------------------------------------------------------  	    
+   			 double kpMotors = 1.2;
+			 double kiMotors = 1.00;
+			 double kdMotors = 1.2;
+   			    
+			 
+			 if (omega == 0) {
+				 
+				 double errorMotors =vLeft-vRight;
+				 integralMotors += errorMotors;
+		   			double derivativeMotors = errorMotors - previousErrorMotors;
+		   			double correctionMotors = kpMotors * errorMotors + kiMotors * integralMotors + kdMotors * derivativeMotors;
+		   			previousErrorMotors = errorMotors;
+		   			double motorspeedLeftF = (motorspeedLeft -correctionMotors);
+		   		    double motorspeedRightF = (motorspeedRight +correctionMotors);
+		   		    
+		   		    this.leftMotor.setPower((int) motorspeedLeftF);
+				    this.rightMotor.setPower((int) motorspeedRightF);
+				    LCD.drawString("vRight: " + vRight, 0, 2);
+	   			    LCD.drawString("vLeft: " + vLeft, 0, 3);
+//	   			    LCD.drawString("Mr: " + motorspeedRightF, 0, 3);
+//	   			    LCD.drawString("Ml: " + motorspeedLeftF,0,4);
+	   			    
+			       
+			    } else {
+			        // Equations for Angular velocity of the robot when omega is not 0
+			    double errorMotors = vLeft+vRight;
+			    integralMotors += errorMotors;
+	   			double derivativeMotors = errorMotors - previousErrorMotors;
+	   			double correctionMotors = kpMotors * errorMotors + kiMotors * integralMotors + kdMotors * derivativeMotors;
+	   			previousErrorMotors = errorMotors;
+	   			double motorspeedLeftF = (motorspeedLeftOmega -correctionMotors);
+	   		    double motorspeedRightF = (motorspeedRightOmega +correctionMotors);
+	   		    this.leftMotor.setPower((int) motorspeedLeftF);
+			    this.rightMotor.setPower((int) motorspeedRightF);
+			    
+			    LCD.drawString("vRight: " + vRight, 0, 2);
+   			    LCD.drawString("vLeft: " + vLeft, 0, 3);
+//   			    LCD.drawString("Mr: " + motorspeedRightF, 0, 3);
+//   			    LCD.drawString("Ml: " + motorspeedLeftF,0,4);
+//   			    LCD.drawString("MR: " + motorspeedRight,0,6);
+//   			    LCD.drawString("ML: " + motorspeedLeft,0,7);
+   			 
+   			 	
+   			 			}
+   			 		
+					}
+			    }
