@@ -1,4 +1,38 @@
- leftMotor.forward();
+  int leftMotorPower = 0;
+	int rightMotorPower = 0;
+	
+	double velocity = 0.0;
+	double angularVelocity = 0.0;
+	
+	
+	
+	double integralRight = 0; // Initialize integral for the right wheel outside the loop or method
+	double previousErrorRight = 0; // Initialize appropriately for the right wheel
+	double integralLeft = 0; // Initialize integral for the left wheel outside the loop or method
+	double previousErrorLeft = 0; // Initialize appropriately for the left wheel
+	double integral=0;
+	double previousError=0;
+	
+	double kp =0; // Proportional gain
+	double ki = 0; // Integral gain
+	double kd = 0;
+	double integralMotors=0;
+	double previousErrorMotors=0;
+
+	double integralRightOmega = 0.0;
+	double previousErrorRightOmega = 0.0;
+	
+	double integralLeftOmega = 0.0;
+	double previousErrorLeftOmega = 0.0;
+	double errorMotors;
+	 //----------------------------------------
+
+
+
+
+
+
+leftMotor.forward();
          rightMotor.forward();
         
          double baseVelocity = 40.0;
